@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
+import os
+import re
 import sys
-import json
 import getpass
-from urllib.request import Request, urlopen
-from urllib.parse import urlencode
+from urllib.request import Request, urlopen, URLopener
+from urllib.parse import urlencode, urlparse
 from urllib.error import HTTPError
 
 
@@ -38,7 +39,26 @@ def main():
     with urlopen(r) as response:
         html = response.read().decode('big5')
 
-    # TODO: get file list and download data
+    folder_tree_pattern = re.compile('insFld\(.+?, gFld\(".+?", "file_list.php\?dir_id=(\d+?)", "\w"\)\);')
+    file_url_pattern = re.compile('<td colspan=3 nowrap>\s+?<a href="(http.+?)"')
+    for i in folder_tree_pattern.finditer(html):
+        dir_id = i.group(1)
+        r = Request('http://www.loxa.edu.tw/jewelbox/file_list.php?dir_id={0}'.format(dir_id),
+                    headers={'cookie': cookie})
+        with urlopen(r) as response:
+            html = response.read().decode('big5')
+
+            for i in file_url_pattern.finditer(html):
+                url = i.group(1)
+                url_data = urlparse(url)
+                file_path = url_data.path.lstrip('/')
+                dir_name, base_name = os.path.split(file_path)
+                if not os.path.exists(dir_name):
+                    os.makedirs(dir_name)
+                url_opener = URLopener()
+                url_opener.addheader('cookie', cookie)
+                print('Download: {0} -> {1}'.format(url, file_path))
+                url_opener.retrieve(url, file_path)
 
 
 if __name__ == '__main__':
